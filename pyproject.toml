@@ -1,0 +1,46 @@
+[project]
+name = "bpd"
+version = "2.0.0"
+readme = "README.md"
+authors = [{ name = "David Gasquez", email = "davidgasquez@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb>=1.4.4",
+    "httpx>=0.28.1",
+    "polars>=1.37.1",
+    "pyarrow>=23.0.0",
+]
+
+[project.scripts]
+bdp = "bdp.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "bdp"
+module-root = ""
+
+[dependency-groups]
+dev = ["prek>=0.3.0", "ruff>=0.14.14", "ty>=0.0.14"]
+
+[tool.ruff]
+preview = true
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle (error)
+    "W",      # pycodestyle (warning)
+    "F",      # pyflakes
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "I",      # isort
+    "UP",     # pyupgrade
+    "PIE",    # flake8-pie
+    "PGH",    # pygrep-hooks
+    "PYI",    # flake8-pyi
+    "RUF",    # ruff
+    "RUF067", # non-empty-init-module
+]
