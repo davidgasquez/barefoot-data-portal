@@ -1,6 +1,6 @@
-# Barefoot Data Portal
+# Barefoot Data Platform
 
-Minimal, local first data portal. Assets are files in `datasets/` that materialize into DuckDB.
+Minimal, local first data platform. Assets are files in `datasets/` that materialize into DuckDB.
 
 ## Quickstart
 

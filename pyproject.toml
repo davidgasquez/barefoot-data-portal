@@ -1,5 +1,5 @@
 [project]
-name = "bdp"
+name = "barefoot-data-platform"
 version = "2.0.0"
 readme = "README.md"
 authors = [{ name = "David Gasquez", email = "davidgasquez@gmail.com" }]

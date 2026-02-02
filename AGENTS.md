@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-The Barefoot Data Portal is a minimalistic and functional open data platform to help get, transform and publish datasets in the age of agents.
+The Barefoot Data Platform is a minimalistic and functional open data platform to help get, transform and publish datasets in the age of agents.
 
 ## Principles
 

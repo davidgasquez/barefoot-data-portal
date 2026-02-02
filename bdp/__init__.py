@@ -1,4 +1,4 @@
-"""Barefoot Data Portal public API."""
+"""Barefoot Data Platform public API."""
 
 from .api import (
     DATASETS_DIR_NAME,

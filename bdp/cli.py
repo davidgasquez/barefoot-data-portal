@@ -6,7 +6,7 @@ import sys
 from bdp.api import find_datasets_root
 from bdp.materialize import discover_assets, materialize
 
-SHORT_HELP = """Barefoot Data Portal CLI.
+SHORT_HELP = """Barefoot Data Platform CLI.
 
 Usage:
   bdp list
@@ -53,7 +53,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="bdp",
-        description="Barefoot Data Portal CLI.",
+        description="Barefoot Data Platform CLI.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
