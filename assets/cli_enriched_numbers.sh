@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# dataset.name = cli_enriched_numbers
-# dataset.schema = raw
-# dataset.depends = raw.base_numbers
+# asset.name = cli_enriched_numbers
+# asset.schema = raw
+# asset.depends = raw.base_numbers
 
 set -euo pipefail
 

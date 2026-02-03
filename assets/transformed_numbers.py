@@ -1,6 +1,6 @@
-# dataset.name = transformed_numbers
-# dataset.schema = raw
-# dataset.depends = raw.base_numbers
+# asset.name = transformed_numbers
+# asset.schema = raw
+# asset.depends = raw.base_numbers
 import polars as pl
 
 import bdp

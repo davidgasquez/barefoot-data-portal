@@ -13,7 +13,7 @@ from typing import Literal
 
 import polars as pl
 
-from bdp.api import db_connection, find_datasets_root
+from bdp.api import db_connection, find_assets_root, get_db_path
 
 AssetKind = Literal["python", "sql", "bash"]
 ASSET_SUFFIXES: dict[str, AssetKind] = {
@@ -24,7 +24,7 @@ ASSET_SUFFIXES: dict[str, AssetKind] = {
 COMMENT_PREFIXES: dict[AssetKind, str] = {"python": "#", "sql": "--", "bash": "#"}
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 METADATA_LINE_RE = re.compile(
-    r"dataset\.(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>.*)"
+    r"asset\.(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>.*)"
 )
 
 
@@ -32,7 +32,7 @@ METADATA_LINE_RE = re.compile(
 class Asset:
     name: str
     schema: str
-    table: str
+    key: str
     path: Path
     kind: AssetKind
     depends: tuple[str, ...]
@@ -40,20 +40,18 @@ class Asset:
 
 def materialize(
     names: Iterable[str] | None = None,
-    *,
-    all_assets: bool = False,
 ) -> None:
-    datasets_root = find_datasets_root()
-    assets = discover_assets(datasets_root)
+    assets_root = find_assets_root()
+    assets = discover_assets(assets_root)
     deps_map = asset_dependencies(assets)
-    selected = resolve_selection(names, all_assets, assets, deps_map)
-    graph = {name: deps_map[name] for name in selected}
+    selected = resolve_selection(names, assets, deps_map)
+    graph = {key: deps_map[key] for key in selected}
     try:
         order = list(TopologicalSorter(graph).static_order())
     except CycleError as exc:
         raise ValueError(f"Dependency cycle detected: {exc}") from exc
-    for name in order:
-        asset = assets[name]
+    for key in order:
+        asset = assets[key]
         if asset.kind == "sql":
             materialize_sql(asset)
             continue
@@ -63,43 +61,132 @@ def materialize(
         materialize_bash(asset)
 
 
-def discover_assets(datasets_root: Path) -> dict[str, Asset]:
+def check_assets() -> None:
+    check_asset_filenames()
+    check_dependencies_exist()
+    check_dependency_cycles()
+    check_asset_bodies()
+    check_duplicate_dependencies()
+
+
+def check_asset_filenames() -> None:
+    assets_root = find_assets_root()
+    for path in asset_files(assets_root):
+        kind = ASSET_SUFFIXES[path.suffix]
+        source = path.read_text(encoding="utf-8")
+        metadata, _ = metadata_from_source(path, kind, source)
+        name = single_metadata_value(metadata, "name", path)
+        validate_identifier(name, "table", path)
+        validate_asset_filename(path, name)
+
+
+def check_dependencies_exist() -> None:
+    deps_map = build_dependency_map(find_assets_root(), check_dep_duplicates=False)
+    validate_dependency_map(deps_map)
+
+
+def check_dependency_cycles() -> None:
+    deps_map = build_dependency_map(find_assets_root(), check_dep_duplicates=False)
+    graph = validate_dependency_map(deps_map)
+    try:
+        list(TopologicalSorter(graph).static_order())
+    except CycleError as exc:
+        raise ValueError(f"Dependency cycle detected: {exc}") from exc
+
+
+def check_asset_bodies() -> None:
+    assets_root = find_assets_root()
+    for path in asset_files(assets_root):
+        kind = ASSET_SUFFIXES[path.suffix]
+        source = path.read_text(encoding="utf-8")
+        _, body_lines = metadata_from_source(path, kind, source)
+        ensure_asset_body(body_lines, path)
+
+
+def check_duplicate_dependencies() -> None:
+    assets_root = find_assets_root()
+    for path in asset_files(assets_root):
+        kind = ASSET_SUFFIXES[path.suffix]
+        source = path.read_text(encoding="utf-8")
+        metadata, _ = metadata_from_source(path, kind, source)
+        parse_dependencies(metadata.get("depends", []), path, check_duplicates=True)
+
+
+def build_dependency_map(
+    assets_root: Path,
+    *,
+    check_dep_duplicates: bool,
+) -> dict[str, tuple[Path, tuple[str, ...]]]:
+    deps_map: dict[str, tuple[Path, tuple[str, ...]]] = {}
+    for path in asset_files(assets_root):
+        kind = ASSET_SUFFIXES[path.suffix]
+        source = path.read_text(encoding="utf-8")
+        schema, name, depends = parse_asset_metadata(
+            path,
+            kind,
+            source,
+            require_body=False,
+            check_dep_duplicates=check_dep_duplicates,
+        )
+        key = f"{schema}.{name}"
+        if key in deps_map:
+            raise ValueError(f"Duplicate asset key: {key}")
+        deps_map[key] = (path, depends)
+    return deps_map
+
+
+def validate_dependency_map(
+    deps_map: dict[str, tuple[Path, tuple[str, ...]]],
+) -> dict[str, list[str]]:
+    graph: dict[str, list[str]] = {}
+    for key, (path, depends) in deps_map.items():
+        deps: list[str] = []
+        for dep_name in depends:
+            if dep_name == key:
+                raise ValueError(f"Asset {key} depends on itself")
+            if dep_name not in deps_map:
+                raise ValueError(
+                    f"Unknown dependency '{dep_name}' referenced in {path}"
+                )
+            deps.append(dep_name)
+        graph[key] = sorted(set(deps))
+    return graph
+
+
+def discover_assets(assets_root: Path) -> dict[str, Asset]:
     assets: dict[str, Asset] = {}
-    for path in asset_files(datasets_root):
+    for path in asset_files(assets_root):
         asset = asset_from_path(path)
-        if asset.name in assets:
-            raise ValueError(f"Duplicate asset name: {asset.name}")
-        assets[asset.name] = asset
+        if asset.key in assets:
+            raise ValueError(f"Duplicate asset key: {asset.key}")
+        assets[asset.key] = asset
     return assets
 
 
 def asset_dependencies(assets: dict[str, Asset]) -> dict[str, list[str]]:
     deps_map: dict[str, list[str]] = {}
-    for name, asset in assets.items():
+    for key, asset in assets.items():
         deps: list[str] = []
         for dep_name in asset.depends:
-            if dep_name == name:
-                raise ValueError(f"Asset {name} depends on itself")
+            if dep_name == key:
+                raise ValueError(f"Asset {key} depends on itself")
             if dep_name not in assets:
                 raise ValueError(
                     f"Unknown dependency '{dep_name}' referenced in {asset.path}"
                 )
             deps.append(dep_name)
-        deps_map[name] = sorted(set(deps))
+        deps_map[key] = sorted(deps)
     return deps_map
 
 
 def resolve_selection(
     names: Iterable[str] | None,
-    all_assets: bool,
     assets: dict[str, Asset],
     deps_map: dict[str, list[str]],
 ) -> set[str]:
-    if all_assets:
+    if not names:
         selected = set(assets)
     else:
-        if not names:
-            raise ValueError("Pass --all or asset names to materialize.")
         requested = list(names)
         unknown = sorted(set(requested) - set(assets))
         if unknown:
@@ -107,17 +194,17 @@ def resolve_selection(
         selected = set(requested)
     stack = list(selected)
     while stack:
-        name = stack.pop()
-        for dep in deps_map[name]:
+        key = stack.pop()
+        for dep in deps_map[key]:
             if dep not in selected:
                 selected.add(dep)
                 stack.append(dep)
     return selected
 
 
-def asset_files(datasets_root: Path) -> list[Path]:
+def asset_files(assets_root: Path) -> list[Path]:
     asset_paths: list[Path] = []
-    for path in datasets_root.rglob("*"):
+    for path in assets_root.rglob("*"):
         if not path.is_file():
             continue
         if path.name.startswith("_"):
@@ -133,39 +220,47 @@ def asset_files(datasets_root: Path) -> list[Path]:
 def asset_from_path(path: Path) -> Asset:
     kind = ASSET_SUFFIXES[path.suffix]
     source = path.read_text(encoding="utf-8")
-    schema, table, depends = parse_dataset_metadata(path, kind, source)
-    name = f"{schema}.{table}"
+    schema, name, depends = parse_asset_metadata(path, kind, source)
+    validate_asset_filename(path, name)
+    key = f"{schema}.{name}"
     return Asset(
         name=name,
         schema=schema,
-        table=table,
+        key=key,
         path=path,
         kind=kind,
         depends=depends,
     )
 
 
-def parse_dataset_metadata(
+def parse_asset_metadata(
     path: Path,
     kind: AssetKind,
     source: str,
+    *,
+    require_body: bool = True,
+    check_dep_duplicates: bool = True,
 ) -> tuple[str, str, tuple[str, ...]]:
-    prefix = COMMENT_PREFIXES[kind]
-    lines = extract_metadata_lines(source, prefix)
-    if not lines:
-        raise ValueError(f"Missing dataset metadata in {path}")
-    metadata = parse_metadata_lines(lines, path)
+    metadata, body_lines = metadata_from_source(path, kind, source)
     schema = single_metadata_value(metadata, "schema", path)
-    table = single_metadata_value(metadata, "name", path)
+    name = single_metadata_value(metadata, "name", path)
     validate_identifier(schema, "schema", path)
-    validate_identifier(table, "table", path)
-    depends = parse_dependencies(metadata.get("depends", []), path)
-    return schema, table, tuple(depends)
+    validate_identifier(name, "table", path)
+    depends = parse_dependencies(
+        metadata.get("depends", []),
+        path,
+        check_duplicates=check_dep_duplicates,
+    )
+    if require_body:
+        ensure_asset_body(body_lines, path)
+    return schema, name, tuple(depends)
 
 
-def extract_metadata_lines(source: str, prefix: str) -> list[str]:
+def extract_metadata_lines(source: str, prefix: str) -> tuple[list[str], list[str]]:
     lines: list[str] = []
-    for line in source.splitlines():
+    source_lines = source.splitlines()
+    body_start = len(source_lines)
+    for index, line in enumerate(source_lines):
         stripped = line.lstrip()
         if not stripped:
             if not lines:
@@ -178,16 +273,34 @@ def extract_metadata_lines(source: str, prefix: str) -> list[str]:
             if content:
                 lines.append(content)
             continue
+        body_start = index
         break
-    return lines
+    if body_start >= len(source_lines):
+        return lines, []
+    return lines, source_lines[body_start:]
+
+
+def metadata_from_source(
+    path: Path,
+    kind: AssetKind,
+    source: str,
+) -> tuple[dict[str, list[str]], list[str]]:
+    prefix = COMMENT_PREFIXES[kind]
+    lines, body_lines = extract_metadata_lines(source, prefix)
+    if not lines:
+        raise ValueError(f"Missing asset metadata in {path}")
+    metadata = parse_metadata_lines(lines, path)
+    return metadata, body_lines
 
 
 def parse_metadata_lines(lines: list[str], path: Path) -> dict[str, list[str]]:
     metadata: dict[str, list[str]] = {}
     for line in lines:
+        if not line.startswith("asset."):
+            continue
         match = METADATA_LINE_RE.fullmatch(line)
         if match is None:
-            raise ValueError(f"Invalid dataset metadata line in {path}: {line}")
+            raise ValueError(f"Invalid asset metadata line in {path}: {line}")
         key = match.group("key")
         value = match.group("value").strip()
         metadata.setdefault(key, []).append(value)
@@ -196,17 +309,23 @@ def parse_metadata_lines(lines: list[str], path: Path) -> dict[str, list[str]]:
 
 def single_metadata_value(metadata: dict[str, list[str]], key: str, path: Path) -> str:
     if key not in metadata or not metadata[key]:
-        raise ValueError(f"Missing dataset.{key} in {path}")
+        raise ValueError(f"Missing asset.{key} in {path}")
     if len(metadata[key]) != 1:
-        raise ValueError(f"dataset.{key} must appear once in {path}")
+        raise ValueError(f"asset.{key} must appear once in {path}")
     value = metadata[key][0]
     if not value:
-        raise ValueError(f"dataset.{key} must have a value in {path}")
+        raise ValueError(f"asset.{key} must have a value in {path}")
     return value
 
 
-def parse_dependencies(values: list[str], path: Path) -> list[str]:
+def parse_dependencies(
+    values: list[str],
+    path: Path,
+    *,
+    check_duplicates: bool = True,
+) -> list[str]:
     deps: list[str] = []
+    seen: set[str] = set()
     for raw in values:
         if not raw:
             continue
@@ -214,9 +333,26 @@ def parse_dependencies(values: list[str], path: Path) -> list[str]:
         for part in parts:
             if not part:
                 continue
+            if check_duplicates and part in seen:
+                raise ValueError(f"Duplicate dependency '{part}' in {path}")
             validate_asset_reference(part, path)
+            seen.add(part)
             deps.append(part)
     return deps
+
+
+def ensure_asset_body(body_lines: list[str], path: Path) -> None:
+    for line in body_lines:
+        if line.strip():
+            return
+    raise ValueError(f"Asset file has no content beyond metadata: {path}")
+
+
+def validate_asset_filename(path: Path, name: str) -> None:
+    if path.stem != name:
+        raise ValueError(
+            f"Asset file name must match asset.name in {path}. Expected {name}"
+        )
 
 
 def validate_asset_reference(value: str, path: Path) -> None:
@@ -242,32 +378,32 @@ def materialize_sql(asset: Asset) -> None:
     with db_connection() as conn:
         conn.execute(f"create schema if not exists {asset.schema}")
         conn.execute(
-            f"create or replace table {asset.schema}.{asset.table} as {sql}"
+            f"create or replace table {asset.schema}.{asset.name} as {sql}"
         )
 
 
 def materialize_python(asset: Asset) -> None:
     module = load_module(asset.path)
-    func = getattr(module, asset.table, None)
+    func = getattr(module, asset.name, None)
     if func is None or not callable(func):
         raise ValueError(
-            f"Python asset {asset.path} must define callable {asset.table}"
+            f"Python asset {asset.path} must define callable {asset.name}"
         )
     result = func()
     if not isinstance(result, pl.DataFrame):
         raise TypeError("Python assets must return polars.DataFrame")
-    write_frame(asset.schema, asset.table, result)
+    write_frame(asset.schema, asset.name, result)
 
 
 def materialize_bash(asset: Asset) -> None:
     with db_connection() as conn:
         conn.execute(f"create schema if not exists {asset.schema}")
     env = dict(os.environ)
-    env.setdefault("BDP_DB_PATH", "bdp.duckdb")
+    env["BDP_DB_PATH"] = str(get_db_path())
     env["BDP_SCHEMA"] = asset.schema
-    env["BDP_TABLE"] = asset.table
+    env["BDP_TABLE"] = asset.name
     subprocess.run(["bash", asset.path.as_posix()], check=True, env=env)
-    ensure_table_exists(asset.schema, asset.table, asset.path)
+    ensure_table_exists(asset.schema, asset.name, asset.path)
 
 
 def load_module(module_path: Path) -> ModuleType:

@@ -9,15 +9,17 @@ import duckdb
 import polars as pl
 
 
+def get_db_path(db_path: Path | str | None = None) -> Path:
+    if db_path is None:
+        return Path(os.environ.get("BDP_DB_PATH", "bdp.duckdb"))
+    return Path(db_path)
+
+
 @contextmanager
 def db_connection(
     db_path: Path | str | None = None,
 ) -> Iterator[duckdb.DuckDBPyConnection]:
-    path = (
-        Path(db_path)
-        if db_path is not None
-        else Path(os.environ.get("BDP_DB_PATH", "bdp.duckdb"))
-    )
+    path = get_db_path(db_path)
     with duckdb.connect(path) as conn:
         yield conn
 
@@ -42,9 +44,9 @@ def table(name: str, *, db_path: Path | str | None = None) -> pl.DataFrame:
     return pl.DataFrame(arrow_table)
 
 
-def find_datasets_root() -> Path:
+def find_assets_root() -> Path:
     for parent in [Path.cwd(), *Path.cwd().parents]:
-        candidate = parent / "datasets"
+        candidate = parent / "assets"
         if candidate.is_dir():
             return candidate
-    raise FileNotFoundError("datasets directory not found")
+    raise FileNotFoundError("assets directory not found")

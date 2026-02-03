@@ -22,8 +22,10 @@ The Barefoot Data Platform is a minimalistic and functional open data platform t
 - Datasets are files without any glue code
 - Use full refresh pipelines as default
 
-## Python
+## Code
 
+- Always `make run` after changing code
+- Check README.md is up to date
 - Always use `uv`
   - `uv run file.py`
   - `uv add`

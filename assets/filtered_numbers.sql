@@ -1,6 +1,6 @@
--- dataset.name = filtered_numbers
--- dataset.schema = raw
--- dataset.depends = raw.transformed_numbers
+-- asset.name = filtered_numbers
+-- asset.schema = raw
+-- asset.depends = raw.transformed_numbers
 select
     value,
     square,

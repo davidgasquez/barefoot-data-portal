@@ -1,5 +1,5 @@
-# dataset.name = base_numbers
-# dataset.schema = raw
+# asset.name = base_numbers
+# asset.schema = raw
 import polars as pl
 
 
