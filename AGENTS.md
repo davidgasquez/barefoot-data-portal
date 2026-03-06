@@ -1,6 +1,7 @@
 # Repository Guidelines
 
-The Barefoot Data Platform is a minimalistic and functional open data platform to help get, transform and publish datasets in the age of agents.
+The Barefoot Data Platform is a minimalistic and functional open data platform
+to help get, transform and publish datasets in the age of agents.
 
 ## Principles
 
@@ -25,7 +26,7 @@ The Barefoot Data Platform is a minimalistic and functional open data platform t
 ## Code
 
 - Always `make run` after changing code
-- Check README.md is up to date
+- Check `README.md` is up to date
 - Always use `uv`
   - `uv run file.py`
   - `uv add`
@@ -33,28 +34,23 @@ The Barefoot Data Platform is a minimalistic and functional open data platform t
 
 ## Writing Assets
 
-- Write assets (`.py`, `.sql`, `.sh` files) inside the `assets/` folder and subdirectories
-- File name must match `asset.name`
+- Write assets (`.py` and `.sql`) inside the `assets/` folder and subdirectories
+- File name is the table name
 - Metadata block at file top as language comments
-  - Required `asset.name`, `asset.schema`
+  - Required `asset.schema`
   - Optional `asset.description`
   - Optional `asset.depends` (can be repeated)
-- Run checks (`uv run bdp check`) after writing assets
+- `asset.name` is not supported
+- Run checks with `uv run bdp check` after writing assets
 
-### Python assets
+### Python Assets
 
-- Define a callable function named `asset.name` with no arguments
-- Return a `polars.DataFrame` or `None`
+- Define a callable function named after the file stem with no arguments
+- Return a `polars.DataFrame`
 - Use `bdp.table("schema.table")` to read dependencies
 - Use `bdp.sql("sql query")` to run arbitrary SQL against the database
 
-### SQL assets
+### SQL Assets
 
 - File content is a SQL query only
-- Runner executes `create or replace table schema.table as <sql>`
-
-### Bash assets
-
-- Handles its own materialization
-- Environment variables injected: `BDP_DB_PATH`, `BDP_SCHEMA`, `BDP_TABLE`.
-- Table existence checked after script.
+- Runner executes `create or replace table schema.file_stem as <sql>`

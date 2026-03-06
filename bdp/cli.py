@@ -1,27 +1,9 @@
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
 from bdp.api import find_assets_root
 from bdp.docs import generate_docs
-from bdp.materialize import (
-    check_asset_bodies,
-    check_asset_filenames,
-    check_dependencies_exist,
-    check_dependency_cycles,
-    check_duplicate_dependencies,
-    discover_assets,
-    materialize,
-)
-
-CHECK_RULES = (
-    ("File name matches asset.name", check_asset_filenames),
-    ("All dependencies exist", check_dependencies_exist),
-    ("No dependency cycles", check_dependency_cycles),
-    ("Asset files have content beyond metadata", check_asset_bodies),
-    ("No duplicate dependencies", check_duplicate_dependencies),
-)
+from bdp.materialize import check_assets, discover_assets, materialize
 
 
 def _materialize(args: argparse.Namespace) -> None:
@@ -29,13 +11,8 @@ def _materialize(args: argparse.Namespace) -> None:
 
 
 def _check(_: argparse.Namespace) -> None:
-    for rule, func in CHECK_RULES:
-        try:
-            func()
-        except Exception:
-            print(f"{rule}: FAIL")
-            raise
-        print(f"{rule}: OK")
+    check_assets()
+    print("Assets: OK")
 
 
 def _list_assets(_: argparse.Namespace) -> None:
@@ -50,9 +27,9 @@ def _list_assets(_: argparse.Namespace) -> None:
         print(f"- {asset.key} [{asset.kind}] ({rel_path})")
         if asset.description:
             print(f"  description: {asset.description}")
-        for index, dep in enumerate(asset.depends):
+        for index, dependency in enumerate(asset.depends):
             connector = "└─" if index == len(asset.depends) - 1 else "├─"
-            print(f"  {connector} {dep}")
+            print(f"  {connector} {dependency}")
 
 
 def _docs(args: argparse.Namespace) -> None:
@@ -77,7 +54,7 @@ def main() -> None:
         metavar="ASSET",
         help="Asset keys to materialize. Defaults to all assets.",
     )
-    materialize_parser.set_defaults(func=_materialize, parser=materialize_parser)
+    materialize_parser.set_defaults(func=_materialize)
 
     check_parser = subparsers.add_parser(
         "check",
