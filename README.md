@@ -44,11 +44,11 @@ Metadata is an optional leading comment block at the top of each asset file.
 Supported keys:
 
 - `asset.description` optional free text stored as a table comment
-- `asset.depends` optional comma-separated `schema.table` references and may be
-  repeated
-- `asset.not_null` optional comma-separated columns that must not be null
-- `asset.unique` optional repeatable comma-separated unique constraints
-- `asset.assert` optional repeatable SQL boolean expressions
+- `asset.depends` optional repeatable `schema.table` references, one per line
+- `asset.not_null` optional repeatable columns that must not be null, one per
+  line
+- `asset.unique` optional repeatable unique-column checks, one per line
+- `asset.assert` optional repeatable SQL boolean expressions, one per line
 
 Other comment lines in the metadata block are ignored.
 
@@ -62,6 +62,7 @@ Define a function named after the file name. It must return a
 ```python
 # asset.description = Base numbers for demos
 # asset.not_null = value
+# asset.not_null = label
 # asset.unique = value
 # asset.assert = value > 0
 import polars as pl

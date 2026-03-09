@@ -22,7 +22,12 @@ module-name = "bdp"
 module-root = ""
 
 [dependency-groups]
-dev = ["prek>=0.3.0", "ruff>=0.14.14", "ty>=0.0.14"]
+dev = [
+    "prek>=0.3.0",
+    "pytest>=9.0.2",
+    "ruff>=0.14.14",
+    "ty>=0.0.14",
+]
 
 [tool.ruff]
 preview = true

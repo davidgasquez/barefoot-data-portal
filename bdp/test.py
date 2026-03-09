@@ -56,12 +56,11 @@ def inline_data_tests(assets: list[Asset], project_root: Path) -> list[DataTest]
                 )
             )
 
-        for columns in asset.tests.unique:
-            suffix = "_".join(columns)
+        for column in asset.tests.unique:
             tests.append(
                 DataTest(
-                    name=f"{asset.key}__unique_{suffix}",
-                    query=unique_query(asset, columns),
+                    name=f"{asset.key}__unique_{column}",
+                    query=unique_query(asset, column),
                     source=source,
                 )
             )
@@ -128,13 +127,11 @@ def not_null_query(asset: Asset) -> str:
     return f"select * from {asset.key} where {conditions}"
 
 
-def unique_query(asset: Asset, columns: tuple[str, ...]) -> str:
-    selected_columns = ", ".join(columns)
-    group_by = ", ".join(columns)
+def unique_query(asset: Asset, column: str) -> str:
     return (
-        f"select {selected_columns}, count(*) as n "
+        f"select {column}, count(*) as n "
         f"from {asset.key} "
-        f"group by {group_by} "
+        f"group by {column} "
         "having count(*) > 1"
     )
 

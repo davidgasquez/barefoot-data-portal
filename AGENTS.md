@@ -38,7 +38,7 @@ The Barefoot Data Platform is a minimalistic and functional open data platform t
 - Metadata block at file top as language comments
   - Optional `asset.description`
   - Optional and repeatable `asset.depends`
-  - Optional `asset.not_null`
+  - Optional and repeatable `asset.not_null`
   - Optional and repeatable `asset.unique`
   - Optional and repeatable `asset.assert`
 

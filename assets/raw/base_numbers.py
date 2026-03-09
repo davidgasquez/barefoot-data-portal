@@ -1,5 +1,8 @@
 # asset.description = Base numbers for demos
-# asset.not_null = value, square, is_even, label
+# asset.not_null = value
+# asset.not_null = square
+# asset.not_null = is_even
+# asset.not_null = label
 # asset.unique = value
 # asset.assert = square = value * value
 import polars as pl

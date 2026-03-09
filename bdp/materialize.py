@@ -44,7 +44,7 @@ CHECK_STATUS_WIDTH = (
 @dataclass(frozen=True)
 class AssetTests:
     not_null: tuple[str, ...]
-    unique: tuple[tuple[str, ...], ...]
+    unique: tuple[str, ...]
     assertions: tuple[str, ...]
 
 
@@ -385,17 +385,17 @@ def parse_dependencies(values: list[str], path: Path) -> list[str]:
     dependencies: list[str] = []
     seen: set[str] = set()
     for raw_value in values:
-        if not raw_value:
-            continue
-        parts = [part.strip() for part in raw_value.split(",")]
-        for dependency in parts:
-            if not dependency:
-                continue
-            if dependency in seen:
-                raise ValueError(f"Duplicate dependency '{dependency}' in {path}")
-            validate_asset_reference(dependency, path)
-            seen.add(dependency)
-            dependencies.append(dependency)
+        dependency = parse_single_metadata_value(
+            raw_value,
+            path,
+            "depends",
+            label="dependency",
+        )
+        if dependency in seen:
+            raise ValueError(f"Duplicate dependency '{dependency}' in {path}")
+        validate_asset_reference(dependency, path)
+        seen.add(dependency)
+        dependencies.append(dependency)
     return dependencies
 
 
@@ -403,27 +403,24 @@ def parse_not_null(values: list[str], path: Path) -> list[str]:
     columns: list[str] = []
     seen: set[str] = set()
     for raw_value in values:
-        for column in parse_column_list(raw_value, path, "not_null"):
-            if column in seen:
-                raise ValueError(
-                    f"Duplicate asset.not_null column '{column}' in {path}"
-                )
-            seen.add(column)
-            columns.append(column)
+        column = parse_single_column_metadata(raw_value, path, "not_null")
+        if column in seen:
+            raise ValueError(f"Duplicate asset.not_null column '{column}' in {path}")
+        seen.add(column)
+        columns.append(column)
     return columns
 
 
-def parse_unique(values: list[str], path: Path) -> list[tuple[str, ...]]:
-    constraints: list[tuple[str, ...]] = []
-    seen: set[tuple[str, ...]] = set()
+def parse_unique(values: list[str], path: Path) -> list[str]:
+    columns: list[str] = []
+    seen: set[str] = set()
     for raw_value in values:
-        columns = tuple(parse_column_list(raw_value, path, "unique"))
-        if columns in seen:
-            joined = ", ".join(columns)
-            raise ValueError(f"Duplicate asset.unique constraint '{joined}' in {path}")
-        seen.add(columns)
-        constraints.append(columns)
-    return constraints
+        column = parse_single_column_metadata(raw_value, path, "unique")
+        if column in seen:
+            raise ValueError(f"Duplicate asset.unique column '{column}' in {path}")
+        seen.add(column)
+        columns.append(column)
+    return columns
 
 
 def parse_assertions(values: list[str], path: Path) -> list[str]:
@@ -440,16 +437,27 @@ def parse_assertions(values: list[str], path: Path) -> list[str]:
     return assertions
 
 
-def parse_column_list(raw_value: str, path: Path, key: str) -> list[str]:
-    columns = [part.strip() for part in raw_value.split(",")]
-    parsed_columns = [column for column in columns if column]
-    if not parsed_columns:
+def parse_single_metadata_value(
+    raw_value: str,
+    path: Path,
+    key: str,
+    *,
+    label: str,
+) -> str:
+    value = raw_value.strip()
+    if not value:
         raise ValueError(f"asset.{key} must have a value in {path}")
-    if len(parsed_columns) != len(set(parsed_columns)):
-        raise ValueError(f"Duplicate asset.{key} columns in {path}")
-    for column in parsed_columns:
-        validate_identifier(column, "column", path)
-    return parsed_columns
+    if "," in value:
+        raise ValueError(
+            f"asset.{key} must declare one {label} per line in {path}: {value}"
+        )
+    return value
+
+
+def parse_single_column_metadata(raw_value: str, path: Path, key: str) -> str:
+    column = parse_single_metadata_value(raw_value, path, key, label="column")
+    validate_identifier(column, "column", path)
+    return column
 
 
 def ensure_asset_body(body_lines: list[str], path: Path) -> None:

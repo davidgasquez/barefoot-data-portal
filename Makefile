@@ -5,11 +5,14 @@ lint:
 	uv run ty check
 
 test:
+	uv run pytest
+	uv run bdp test
+
+data-test:
 	uv run bdp test
 
 check: lint
 	uv run bdp check
-	uv run bdp test
 
 run:
 	uv run bdp materialize
