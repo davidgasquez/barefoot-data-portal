@@ -216,7 +216,7 @@ def render_asset_section(
         "  <h3>Definition</h3>",
         f"  {render_asset_table(asset)}",
         "  <h3>Columns</h3>",
-        f"  {render_columns_table(columns)}",
+        f"  {render_columns_table(columns, asset)}",
         f'  <div class="small">Rows: {row_count}</div>',
         "  <h3>Sample</h3>",
         f"  {render_sample_table(sample_columns, sample_values)}",
@@ -234,11 +234,25 @@ def render_asset_table(asset: Asset) -> str:
     return render_table(["Field", "Value"], rows)
 
 
-def render_columns_table(columns: list[tuple[str, str]]) -> str:
+def render_columns_table(columns: list[tuple[str, str]], asset: Asset) -> str:
     if not columns:
         return '<div class="small">No columns.</div>'
-    rows = [[html.escape(name), html.escape(dtype)] for name, dtype in columns]
-    return render_table(["Column", "Type"], rows)
+    tests_by_column = column_tests(asset)
+    rows = [
+        [
+            html.escape(name),
+            html.escape(dtype),
+            render_column_tests(tests_by_column.get(name, [])),
+        ]
+        for name, dtype in columns
+    ]
+    for assertion in asset.tests.assertions:
+        rows.append([
+            "",
+            "",
+            f"<code>assert: {html.escape(assertion)}</code>",
+        ])
+    return render_table(["Column", "Type", "Tests"], rows)
 
 
 def render_sample_table(
@@ -269,6 +283,23 @@ def render_table(headers: list[str], rows: list[list[str]]) -> str:
         "    </tbody>",
         "  </table>",
     ])
+
+
+def render_column_tests(tests: list[str]) -> str:
+    if not tests:
+        return ""
+    return ", ".join(
+        f"<code>{html.escape(t)}</code>" for t in tests
+    )
+
+
+def column_tests(asset: Asset) -> dict[str, list[str]]:
+    tests: dict[str, list[str]] = {}
+    for column in asset.tests.not_null:
+        tests.setdefault(column, []).append("not_null")
+    for column in asset.tests.unique:
+        tests.setdefault(column, []).append("unique")
+    return tests
 
 
 def render_depends_value(dependencies: tuple[str, ...]) -> str:
