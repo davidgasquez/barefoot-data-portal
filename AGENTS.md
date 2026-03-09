@@ -32,7 +32,7 @@ The Barefoot Data Platform is a minimalistic and functional open data platform t
 ## Writing Assets
 
 - Write assets (`.py` and `.sql`) inside the `assets/` folder
-  - First level directory is the database schema. Further folders become prefixes. 
+  - First level directory is the database schema. Further folders become prefixes.
     - `assets/raw/base_numbers.py` becomes the table `raw.base_numbers`
     - `assets/raw/alt/base_numbers.py` becomes the table `raw.alt_base_numbers`
 - Metadata block at file top as language comments
