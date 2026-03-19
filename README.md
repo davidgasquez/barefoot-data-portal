@@ -98,6 +98,7 @@ create or replace table schema.table_name as <sql>
 - `bdp check`
 - `bdp materialize`
 - `bdp test`
+- `bdp show schema.table`
 - `bdp materialize schema.table [schema.table ...]`
 - `bdp docs --out index.html`
 

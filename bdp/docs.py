@@ -288,9 +288,7 @@ def render_table(headers: list[str], rows: list[list[str]]) -> str:
 def render_column_tests(tests: list[str]) -> str:
     if not tests:
         return ""
-    return ", ".join(
-        f"<code>{html.escape(t)}</code>" for t in tests
-    )
+    return ", ".join(f"<code>{html.escape(t)}</code>" for t in tests)
 
 
 def column_tests(asset: Asset) -> dict[str, list[str]]:

@@ -4,6 +4,7 @@ from pathlib import Path
 from bdp.api import find_assets_root
 from bdp.docs import generate_docs
 from bdp.materialize import check_assets, discover_assets, materialize
+from bdp.show import show_asset
 from bdp.test import test_assets
 
 
@@ -38,6 +39,10 @@ def _docs(args: argparse.Namespace) -> None:
 
 def _test(args: argparse.Namespace) -> None:
     test_assets(sample_rows=args.sample_rows)
+
+
+def _show(args: argparse.Namespace) -> None:
+    show_asset(args.asset, sample_rows=args.sample_rows)
 
 
 def main() -> None:
@@ -101,6 +106,23 @@ def main() -> None:
         help="Number of failing rows to print per failed test.",
     )
     test_parser.set_defaults(func=_test)
+
+    show_parser = subparsers.add_parser(
+        "show",
+        help="Show details for an asset.",
+    )
+    show_parser.add_argument(
+        "asset",
+        metavar="ASSET",
+        help="Asset key to inspect.",
+    )
+    show_parser.add_argument(
+        "--sample-rows",
+        type=int,
+        default=5,
+        help="Number of sample rows to print when materialized.",
+    )
+    show_parser.set_defaults(func=_show)
 
     args = parser.parse_args()
     args.func(args)
